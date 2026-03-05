@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
@@ -22,6 +21,20 @@ app.use('/api/activities', activitiesRouter);
 app.use('/api/notify', notifyRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
+// Global error handler
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled error:', err.message);
+  res.status(500).json({ success: false, message: err.message });
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+});
 
 initWebSocket(httpServer);
 

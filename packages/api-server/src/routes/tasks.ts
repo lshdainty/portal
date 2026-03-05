@@ -1,59 +1,154 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { broadcastEvent } from '../websocket.js';
-import type { RowDataPacket } from 'mysql2/promise';
+import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
 const router = Router();
 
 router.get('/', async (req, res) => {
-  const projectId = Number(req.query.project_id) || 1;
-  const status = req.query.status as string | undefined;
-  let query = `
-    SELECT t.*, a.name AS assignee_name, c.name AS created_by_name
-    FROM tasks t
-    LEFT JOIN agents a ON t.assignee_id = a.id
-    LEFT JOIN agents c ON t.created_by_id = c.id
-    WHERE t.project_id = ?
-  `;
-  const params: (string | number)[] = [projectId];
-  if (status) { query += ' AND t.status = ?'; params.push(status); }
-  query += ' ORDER BY t.sort_order ASC';
+  try {
+    const projectId = Number(req.query.project_id) || 1;
+    const status = req.query.status as string | undefined;
+    let query = `
+      SELECT t.*, a.name AS assignee_name, c.name AS created_by_name
+      FROM tasks t
+      LEFT JOIN agents a ON t.assignee_id = a.id
+      LEFT JOIN agents c ON t.created_by_id = c.id
+      WHERE t.project_id = ?
+    `;
+    const params: (string | number)[] = [projectId];
+    if (status) { query += ' AND t.status = ?'; params.push(status); }
+    query += ' ORDER BY t.sort_order ASC';
 
-  const [rows] = await pool.execute<RowDataPacket[]>(query, params);
-  res.json({ success: true, data: rows });
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    res.json({ success: true, data: rows });
+  } catch (err: unknown) {
+    console.error('GET /tasks error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch tasks' });
+  }
+});
+
+router.post('/', async (req, res) => {
+  try {
+    const { project_id, title, description, status, priority, assignee_id, created_by_id, sort_order } = req.body;
+    const [result] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO tasks (project_id, title, description, status, priority, assignee_id, created_by_id, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        project_id,
+        title,
+        description ?? null,
+        status ?? 'todo',
+        priority ?? 'medium',
+        assignee_id ?? null,
+        created_by_id ?? null,
+        sort_order ?? 0,
+      ]
+    );
+
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT t.*, a.name AS assignee_name, c.name AS created_by_name
+       FROM tasks t
+       LEFT JOIN agents a ON t.assignee_id = a.id
+       LEFT JOIN agents c ON t.created_by_id = c.id
+       WHERE t.id = ?`,
+      [result.insertId]
+    );
+    const task = rows[0];
+
+    broadcastEvent({
+      event: 'task:created',
+      project_id: project_id as number,
+      data: task as Record<string, unknown>,
+    });
+
+    res.json({ success: true, data: task });
+  } catch (err: unknown) {
+    console.error('POST /tasks error:', err);
+    res.status(500).json({ success: false, message: 'Failed to create task' });
+  }
 });
 
 router.patch('/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  const { status, sort_order } = req.body as { status?: string; sort_order?: number };
-  const setClauses: string[] = [];
-  const params: (string | number)[] = [];
+  try {
+    const id = Number(req.params.id);
+    const { status, sort_order, title, description, priority, assignee_id } = req.body as {
+      status?: string;
+      sort_order?: number;
+      title?: string;
+      description?: string;
+      priority?: string;
+      assignee_id?: number | null;
+    };
+    const setClauses: string[] = [];
+    const params: (string | number | null)[] = [];
 
-  if (status) { setClauses.push('status = ?'); params.push(status); }
-  if (sort_order !== undefined) { setClauses.push('sort_order = ?'); params.push(sort_order); }
+    if (status) { setClauses.push('status = ?'); params.push(status); }
+    if (sort_order !== undefined) { setClauses.push('sort_order = ?'); params.push(sort_order); }
+    if (title) { setClauses.push('title = ?'); params.push(title); }
+    if (description !== undefined) { setClauses.push('description = ?'); params.push(description); }
+    if (priority) { setClauses.push('priority = ?'); params.push(priority); }
+    if (assignee_id !== undefined) { setClauses.push('assignee_id = ?'); params.push(assignee_id); }
 
-  if (setClauses.length === 0) {
-    res.status(400).json({ success: false, message: 'No fields to update' });
-    return;
+    if (setClauses.length === 0) {
+      res.status(400).json({ success: false, message: 'No fields to update' });
+      return;
+    }
+
+    setClauses.push('updated_at = NOW()');
+    params.push(id);
+
+    await pool.execute(`UPDATE tasks SET ${setClauses.join(', ')} WHERE id = ?`, params);
+
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT t.*, a.name AS assignee_name, c.name AS created_by_name
+       FROM tasks t
+       LEFT JOIN agents a ON t.assignee_id = a.id
+       LEFT JOIN agents c ON t.created_by_id = c.id
+       WHERE t.id = ?`,
+      [id]
+    );
+    const task = rows[0];
+
+    if (task) {
+      broadcastEvent({
+        event: 'task:updated',
+        project_id: task.project_id as number,
+        data: task as Record<string, unknown>,
+      });
+    }
+
+    res.json({ success: true, data: task });
+  } catch (err: unknown) {
+    console.error('PATCH /tasks error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update task' });
   }
+});
 
-  setClauses.push('updated_at = NOW()');
-  params.push(id);
+router.delete('/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [id]);
+    const task = rows[0];
 
-  await pool.execute(`UPDATE tasks SET ${setClauses.join(', ')} WHERE id = ?`, params);
+    if (!task) {
+      res.status(404).json({ success: false, message: 'Task not found' });
+      return;
+    }
 
-  const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM tasks WHERE id = ?', [id]);
-  const task = rows[0];
+    await pool.execute('DELETE FROM tasks WHERE id = ?', [id]);
 
-  if (task) {
     broadcastEvent({
       event: 'task:updated',
       project_id: task.project_id as number,
-      data: task as Record<string, unknown>,
+      data: { id, deleted: true } as Record<string, unknown>,
     });
-  }
 
-  res.json({ success: true, data: task });
+    res.json({ success: true, data: { id } });
+  } catch (err: unknown) {
+    console.error('DELETE /tasks error:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete task' });
+  }
 });
 
 export default router;

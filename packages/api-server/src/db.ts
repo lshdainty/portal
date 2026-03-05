@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: 'packages/api-server/.env' });
+
 import mysql from 'mysql2/promise';
 
 const pool = mysql.createPool({
