@@ -1,0 +1,21 @@
+{
+  "name": "@agent-kanban/mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@agent-kanban/shared": "*",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "mysql2": "^3.11.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "~5.7.0"
+  }
+}

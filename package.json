@@ -1,0 +1,20 @@
+{
+  "name": "agent-kanban",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "packages/mcp-server",
+    "packages/api-server",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:shared": "npm run build -w packages/shared",
+    "build:mcp": "npm run build -w packages/mcp-server",
+    "build:api": "npm run build -w packages/api-server",
+    "build:front": "npm run build -w frontend",
+    "dev:api": "npm run dev -w packages/api-server",
+    "dev:front": "npm run dev -w frontend",
+    "db:init": "mariadb < scripts/init-db.sql"
+  }
+}
