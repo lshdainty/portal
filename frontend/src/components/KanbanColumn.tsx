@@ -24,7 +24,7 @@ export function KanbanColumn({ id, title, tasks, onTaskClick }: KanbanColumnProp
     <div
       ref={setNodeRef}
       className={cn(
-        'flex flex-col rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] min-h-[200px] transition-all',
+        'flex flex-col rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] min-h-0 h-full overflow-hidden transition-all',
         isOver && 'ring-2 ring-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_5%,var(--color-background))]',
       )}
     >
@@ -40,7 +40,7 @@ export function KanbanColumn({ id, title, tasks, onTaskClick }: KanbanColumnProp
           {tasks.length}
         </span>
       </div>
-      <div className="flex flex-col gap-2 p-3 flex-1 overflow-y-auto">
+      <div className="flex flex-col gap-1.5 p-2 flex-1 min-h-0 overflow-y-auto">
         {tasks.map((task) => (
           <TaskCard key={task.id} task={task} onCardClick={onTaskClick} />
         ))}

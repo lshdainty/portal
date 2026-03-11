@@ -32,8 +32,8 @@ export function ActivityLog({ projectId }: ActivityLogProps) {
             <span className="text-[var(--color-muted-foreground)] font-mono w-4 text-center shrink-0 mt-0.5">
               {ACTION_ICONS[activity.action] || '•'}
             </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-[var(--color-card-foreground)] leading-relaxed">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <p className="text-[var(--color-card-foreground)] leading-relaxed break-words [overflow-wrap:anywhere]">
                 {activity.agent_name && (
                   <span className="font-medium text-[var(--color-primary)]">
                     {activity.agent_name}

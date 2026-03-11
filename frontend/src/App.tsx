@@ -92,8 +92,8 @@ function Dashboard() {
           Connected
         </div>
       </header>
-      <div className="flex-1 grid grid-cols-[1fr_300px] gap-4 p-4 overflow-hidden">
-        <div className="overflow-auto">
+      <div className="flex-1 grid grid-cols-[1fr_300px] gap-4 p-4 overflow-hidden min-h-0">
+        <div className="overflow-hidden h-full">
           <KanbanBoard projectId={projectId} />
         </div>
         <aside className="flex flex-col gap-4 overflow-auto">
